@@ -25,7 +25,6 @@ contract Database{
      uint256 employeeCount=0;
      mapping(uint256=>Company) public company;
      mapping(uint256=>Employee) public employee;
-     mapping(string=>Employee) public employeeFromCompany;
      event CompanyCreated(uint256 id, string _companyAddress,string _companyName,uint256 _timestamp);
      event EmployeeCreated(bytes32 uid,string name,string employeeAddress,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
     
@@ -98,6 +97,26 @@ contract Database{
                      }
                 }
            }
+       }
+       function UpdateEmployeeSalary(string memory _name,string memory _companyAddress,uint256 _salary)public{
+                  require(bytes(_name).length > 1,"You must enter the name of employee");
+                  require(bytes(_companyAddress).length == 42,"You must enter the Company Crypto wallet address");
+                  require(_salary > 0,"Enter the salary of the employee");
+                  bool _isUpdate=false;
+                  for(uint i=0; i<companyCount;i++){
+                      if(keccak256(bytes(company[i].companyAddress)) == keccak256(bytes(_companyAddress))){
+                          for(uint j=0; j<employeeCount;j++){
+                              if(keccak256(bytes(employee[j].name)) == keccak256(bytes(_name))){
+                                  employee[j].salary = _salary;
+                                  _isUpdate=true;
+                                  break;
+                              }
+                          }
+                      }
+
+                      if(_isUpdate)
+                          break;
+                  }
        }
         
        function EmployeesNumberFromCompany(string memory _companyName)public view returns(uint256){
