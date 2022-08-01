@@ -23,7 +23,6 @@ contract Database{
    }
      uint256 companyCount=0;
      uint256 employeeCount=0;
-     //Company[] companyData;
      mapping(uint256=>Company) public company;
      mapping(uint256=>Employee) public employee;
      mapping(string=>Employee) public employeeFromCompany;
@@ -43,7 +42,6 @@ contract Database{
                   uint256 _time = block.timestamp;
                   company[companyCount] = Company(companyCount,0,_companyAddress,_companyName,_time);
                   emit CompanyCreated(companyCount,_companyAddress,_companyName,_time);
-                  //companyData.push(company[companyCount]);
                   companyCount++;
           }
      }
@@ -117,5 +115,19 @@ contract Database{
          }
          return _employeeCounter;
        }
-       
+       function EmployeesExpensesFromCompany(string memory _companyName)public view returns(uint256){
+           require(bytes(_companyName).length >1,"Enter the name of the company!");
+           uint256 _expenses=0;
+           for(uint i=0; i<companyCount;i++){
+              if(keccak256(bytes(company[i].companyName)) == keccak256(bytes(_companyName))){
+                        for(uint j=0; j<employeeCount;j++){
+                            if(keccak256(bytes(employee[j].companyAddress)) == keccak256(bytes(company[i].companyAddress))){
+                                  _expenses += employee[j].salary;
+                            }
+                        }
+                    break;
+              }
+       }
+        return _expenses;
    }
+}
