@@ -29,8 +29,8 @@ contract Database{
      event EmployeeCreated(bytes32 uid,string name,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
     
      function CreatedCompany(string memory _companyAddress,string memory _companyName)public{
-          require(bytes(_companyAddress).length > 1,"You must enter the cypto wallet address!");
-          require(bytes(_companyName).length > 1,"You must enter the company name!");
+          require(bytes(_companyAddress).length == 42,"You must enter the cypto wallet address!");
+          require(bytes(_companyName).length > 2,"You must enter the company name!");
           bool isAlreadyCreated=false;
           for(uint i=0; i<companyCount;i++){
                   if(keccak256(bytes(_companyAddress)) == keccak256(bytes(company[i].companyAddress))){
