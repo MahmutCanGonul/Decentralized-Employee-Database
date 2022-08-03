@@ -43,6 +43,7 @@ contract Database{
                   emit CompanyCreated(companyCount,_companyAddress,_companyName,_time);
                   companyCount++;
           }
+          
      }
     
      function AddEmployee(string memory _name,string memory _employeeAddress,string memory _companyAddress,string memory _phoneNumber,string memory _location,string memory _job,
@@ -149,4 +150,16 @@ contract Database{
        }
         return _expenses;
    }
+   function GetEmployeesFromLocation(string memory _location)public view returns(Employee  [] memory){
+       uint _counter=0;
+       Employee [] memory _employees = new Employee[](employeeCount);
+       for(uint i=0; i<employeeCount;i++){
+           if(keccak256(bytes(_location)) == keccak256(bytes(employee[i].location))){
+               _employees[_counter] = employee[i];
+               _counter++;
+           }
+       }
+       return _employees;
+   } 
+    
 }
