@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+
 contract Database{
 
    struct Employee{
@@ -28,21 +29,25 @@ contract Database{
      event CompanyCreated(uint256 id, string _companyAddress,string _companyName,uint256 _timestamp);
      event EmployeeCreated(bytes32 uid,string name,string employeeAddress,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
     
+    function ControlCompanyInfo(string memory _companyAddress,string memory _companyName)private view returns(bool){
+        bool isValid=true;
+        for(uint i=0; i<companyCount;i++){
+            if(keccak256(bytes(company[i].companyAddress)) == keccak256(bytes(_companyAddress)) ||
+              keccak256(bytes(company[i].companyName)) == keccak256(bytes(_companyName))){
+                isValid=false;
+            }
+        }
+        return isValid;
+    }
+
      function CreatedCompany(string memory _companyAddress,string memory _companyName)public{
-          require(bytes(_companyAddress).length == 42,"You must enter the cypto wallet address!");
-          require(bytes(_companyName).length > 2,"You must enter the company name!");
-          bool isAlreadyCreated=false;
-          for(uint i=0; i<companyCount;i++){
-                  if(keccak256(bytes(_companyAddress)) == keccak256(bytes(company[i].companyAddress))){
-                      isAlreadyCreated = true;
-                  }      
-          }
-          if(!isAlreadyCreated){
-                  uint256 _time = block.timestamp;
-                  company[companyCount] = Company(companyCount,0,_companyAddress,_companyName,_time);
-                  emit CompanyCreated(companyCount,_companyAddress,_companyName,_time);
-                  companyCount++;
-          }
+        require(bytes(_companyAddress).length == 42,"You must enter the cypto wallet address!");
+        require(bytes(_companyName).length > 2,"You must enter the company name!");
+        require(ControlCompanyInfo(_companyAddress,_companyName) == true,"Address or Name already registered!");
+        uint256 _time = block.timestamp;
+        company[companyCount] = Company(companyCount,0,_companyAddress,_companyName,_time);
+        emit CompanyCreated(companyCount,_companyAddress,_companyName,_time);
+        companyCount++; 
           
      }
     
@@ -87,6 +92,7 @@ contract Database{
                 if(keccak256(bytes(company[i].companyAddress)) == keccak256(bytes(_companyAddress))){
                      for(uint j=0; j<employeeCount;j++){
                          if(employee[j].uid == keccak256(abi.encodePacked(_id))){
+                                 employee[j].employeeAddress="***";
                                  employee[j].companyAddress="***";
                                  employee[j].phoneNumber="***";
                                  employee[j].name="***";
@@ -151,6 +157,7 @@ contract Database{
         return _expenses;
    }
    function GetEmployeesFromLocation(string memory _location)public view returns(Employee  [] memory){
+       require(bytes(_location).length >1,"Enter the location!");
        uint _counter=0;
        Employee [] memory _employees = new Employee[](employeeCount);
        for(uint i=0; i<employeeCount;i++){
@@ -161,5 +168,25 @@ contract Database{
        }
        return _employees;
    } 
+   function GetEmployeesFromCompany(string memory _companyName)public view returns(Employee  [] memory){
+        require(bytes(_companyName).length >1,"Enter the name of the company!");
+        uint _counter=0;
+        Employee [] memory _employees = new Employee[](employeeCount);
+        for(uint i=0; i<companyCount;i++){
+            if(keccak256(bytes(_companyName)) == keccak256(bytes(company[i].companyName))){
+                for(uint j=0; j<employeeCount;j++){
+                    if(keccak256(bytes(employee[j].companyAddress)) == keccak256(bytes(company[i].companyAddress))){
+                        _employees[_counter] = employee[j];
+                        _counter++;
+        
+                    }
+                }
+                break;
+            }
+        }
+        return _employees;
+    }
+   
+
     
 }
