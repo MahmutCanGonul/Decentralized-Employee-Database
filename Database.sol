@@ -22,14 +22,26 @@ contract Database{
        string companyName;
        uint256 timeStamp; 
    }
-     uint256 companyCount=0;
-     uint256 employeeCount=0;
-     mapping(uint256=>Company) public company;
-     mapping(uint256=>Employee) public employee;
-     event CompanyCreated(uint256 id, string _companyAddress,string _companyName,uint256 _timestamp);
-     event EmployeeCreated(bytes32 uid,string name,string employeeAddress,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
-    
-    function ControlCompanyInfo(string memory _companyAddress,string memory _companyName)private view returns(bool){
+   struct Invite{
+       uint256 id;
+       string employeeAddress;
+       string companyAddress;
+       uint256 offerPrice;
+       bool accepted;
+       bool rejected;
+       uint256 timeStamp;
+   }
+
+    uint256 companyCount=0;
+    uint256 employeeCount=0;
+    uint256 inviteCount=0;
+    mapping(uint256=>Company) public company;
+    mapping(uint256=>Employee) public employee;
+    mapping(uint256=>Invite) public invite;
+    event CompanyCreated(uint256 id, string _companyAddress,string _companyName,uint256 _timestamp);
+    event EmployeeCreated(uint256 id,bytes32 uid,string name,string employeeAddress,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
+    event InviteCreated(uint256 id,string _employeeAddress,string _companyAddress,uint256 _offerPrice,bool _accepted,bool _rejected,uint256 _timeStamp);
+    function ControlCompanyInfoForCreatedCompany(string memory _companyAddress,string memory _companyName)private view returns(bool){
         bool isValid=true;
         for(uint i=0; i<companyCount;i++){
             if(keccak256(bytes(company[i].companyAddress)) == keccak256(bytes(_companyAddress)) ||
@@ -39,11 +51,33 @@ contract Database{
         }
         return isValid;
     }
-
+    function ControlEmployeeInfoForInvite(string memory _employeeAddress)private view returns(bool){
+        bool isValid =false;
+        for(uint256 i=0; i<employeeCount;i++){
+            if(keccak256(bytes(_employeeAddress)) == keccak256(bytes(employee[i].employeeAddress))){
+                isValid = true;
+                break;
+            }
+        }
+        return isValid;
+    }
+    
+    function CreatedInvite(string memory _employeeAddress,string memory _companyAddress,uint256 _offerPrice)public{
+        require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Can not found employee!");
+        require(ControlCompanyInfoForCreatedCompany(_companyAddress,"") == false,"Can not found Company!"); 
+        require(_offerPrice > 0,"Coin value is not valid!");
+        require(GetCompanyFromAddress(_companyAddress).totalCoin >=_offerPrice,"Company Coin is not enough!");
+        uint256 _timeStamp = block.timestamp;
+        invite[inviteCount] = Invite(inviteCount,_employeeAddress,_companyAddress,_offerPrice,false,false,_timeStamp);
+        emit InviteCreated(inviteCount,_employeeAddress,_companyAddress,_offerPrice,false,false,_timeStamp);
+        inviteCount++;
+              
+    } 
+     
      function CreatedCompany(string memory _companyAddress,string memory _companyName)public{
         require(bytes(_companyAddress).length == 42,"You must enter the cypto wallet address!");
         require(bytes(_companyName).length > 2,"You must enter the company name!");
-        require(ControlCompanyInfo(_companyAddress,_companyName) == true,"Address or Name already registered!");
+        require(ControlCompanyInfoForCreatedCompany(_companyAddress,_companyName) == true,"Address or Name already registered!");
         uint256 _time = block.timestamp;
         company[companyCount] = Company(companyCount,0,_companyAddress,_companyName,_time);
         emit CompanyCreated(companyCount,_companyAddress,_companyName,_time);
@@ -79,7 +113,7 @@ contract Database{
 
                     );
                     employee[employeeCount] = Employee(employeeCount,_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
-                    emit EmployeeCreated(_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
+                    emit EmployeeCreated(employeeCount,_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
                     employeeCount++;
                     break;        
                }
@@ -155,6 +189,15 @@ contract Database{
               }
        }
         return _expenses;
+   }
+   function GetCompanyFromAddress(string memory _companyAddress)private view returns(Company memory){
+      Company memory _company;
+      for(uint256 i=0; i<companyCount;i++){
+          if(keccak256(bytes(_companyAddress)) == keccak256(bytes(company[i].companyAddress))){
+              _company = company[i];
+          }
+      }
+     return _company;
    }
    function GetEmployeesFromLocation(string memory _location)public view returns(Employee  [] memory){
        require(bytes(_location).length >1,"Enter the location!");
