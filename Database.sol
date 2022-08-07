@@ -41,6 +41,7 @@ contract Database{
     event CompanyCreated(uint256 id, string _companyAddress,string _companyName,uint256 _timestamp);
     event EmployeeCreated(uint256 id,bytes32 uid,string name,string employeeAddress,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
     event InviteCreated(uint256 id,string _employeeAddress,string _companyAddress,uint256 _offerPrice,bool _accepted,bool _rejected,uint256 _timeStamp);
+    
     function ControlCompanyInfoForCreatedCompany(string memory _companyAddress,string memory _companyName)private view returns(bool){
         bool isValid=true;
         for(uint i=0; i<companyCount;i++){
@@ -61,7 +62,7 @@ contract Database{
         }
         return isValid;
     }
-    
+
     function CreatedInvite(string memory _employeeAddress,string memory _companyAddress,uint256 _offerPrice)public{
         require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Can not found employee!");
         require(ControlCompanyInfoForCreatedCompany(_companyAddress,"") == false,"Can not found Company!"); 
@@ -85,7 +86,8 @@ contract Database{
           
      }
     
-     function AddEmployee(string memory _name,string memory _employeeAddress,string memory _companyAddress,string memory _phoneNumber,string memory _location,string memory _job,
+     function AddEmployee(string memory _name,string memory _employeeAddress,string memory _companyAddress,
+     string memory _phoneNumber,string memory _location,string memory _job,
      uint256  _salary,string memory _national)public{
          require(bytes(_name).length > 1,"Enter a name!");
          require(bytes(_companyAddress).length > 1,"You must enter the cypto wallet address!");
@@ -93,7 +95,7 @@ contract Database{
          require(bytes(_location).length > 1,"Enter a location!");
          require(bytes(_job).length > 1,"Enter a job!");
          require(bytes(_national).length > 1,"Enter a national!");
-        
+         require(ControlEmployeeInfoForInvite(_employeeAddress) == false,"This employee address already added");
          for(uint i=0; i<companyCount;i++){
              if(keccak256(bytes(_companyAddress)) == keccak256(bytes(company[i].companyAddress))){
                     bytes32 _uid = keccak256(abi.encodePacked(employeeCount));
@@ -109,8 +111,7 @@ contract Database{
                        _time,
                        _job,
                       _salary,
-                       _national
-
+                      _national
                     );
                     employee[employeeCount] = Employee(employeeCount,_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
                     emit EmployeeCreated(employeeCount,_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
@@ -139,42 +140,41 @@ contract Database{
                 }
            }
        }
-       function UpdateEmployeeSalary(string memory _name,string memory _companyAddress,uint256 _salary)public{
-                  require(bytes(_name).length > 1,"You must enter the name of employee");
-                  require(bytes(_companyAddress).length == 42,"You must enter the Company Crypto wallet address");
-                  require(_salary > 0,"Enter the salary of the employee");
-                  bool _isUpdate=false;
-                  for(uint i=0; i<companyCount;i++){
-                      if(keccak256(bytes(company[i].companyAddress)) == keccak256(bytes(_companyAddress))){
-                          for(uint j=0; j<employeeCount;j++){
-                              if(keccak256(bytes(employee[j].name)) == keccak256(bytes(_name))){
-                                  employee[j].salary = _salary;
-                                  _isUpdate=true;
-                                  break;
-                              }
-                          }
-                      }
-
-                      if(_isUpdate)
-                          break;
-                  }
-       }
-        
-       function EmployeesNumberFromCompany(string memory _companyName)public view returns(uint256){
-           require(bytes(_companyName).length >1,"Enter the name of the company!");
-           uint256 _employeeCounter=0;
-           for(uint i=0; i<companyCount;i++){
-              if(keccak256(bytes(company[i].companyName)) == keccak256(bytes(_companyName))){
-                        for(uint j=0; j<employeeCount;j++){
-                            if(keccak256(bytes(employee[j].companyAddress)) == keccak256(bytes(company[i].companyAddress))){
-                                  _employeeCounter++;
+       function UpdateEmployeeSalary(string memory _employeeAddress,string memory _companyAddress,uint256 _salary)public{
+                require(bytes(_employeeAddress).length == 42,"You must enter the name of employee");
+                require(bytes(_companyAddress).length == 42,"You must enter the Company Crypto wallet address");
+                require(_salary > 0,"Enter the salary of the employee");
+                for(uint i=0; i<employeeCount;i++){
+                        if(keccak256(bytes(employee[i].employeeAddress)) == keccak256(bytes(_employeeAddress))
+                        && keccak256(bytes(employee[i].companyAddress)) == keccak256(bytes(_companyAddress))){
+                                employee[i].salary = _salary;
+                                break;
                             }
                         }
-                        break;
-              }
-         }
-         return _employeeCounter;
+ 
        }
+       function UpdateInviteDecision(string memory _employeeAddress,uint256 _id,bool _desicion)public{
+           require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Employee Address is not valid!");
+           require(_id >= 0,"Id issue detected!");
+           if(keccak256(bytes(invite[_id].employeeAddress)) == keccak256(bytes(_employeeAddress))){
+                      if(_desicion){
+                          uint daysDiff = (block.timestamp-GetTimeStampFromEmployee(_employeeAddress)) / 60 / 60 / 24; 
+                          if(daysDiff >= 365){
+                               invite[_id].accepted = true;
+                               RemoveEmployee(GetCompanyAddressFromEmployee(_employeeAddress),GetIdFromEmployee(_employeeAddress));
+                               Employee memory _employee = GetEmployeeFromAddress(invite[_id].employeeAddress);
+                               AddEmployee(_employee.name,_employee.employeeAddress,
+                               invite[_id].companyAddress,_employee.phoneNumber,_employee.location,
+                               _employee.job,invite[_id].offerPrice,_employee.national);
+                          }   
+                      }
+                      else{
+                          invite[_id].rejected = true;
+                      }
+           }
+
+       }
+        
        function EmployeesExpensesFromCompany(string memory _companyName)public view returns(uint256){
            require(bytes(_companyName).length >1,"Enter the name of the company!");
            uint256 _expenses=0;
@@ -198,6 +198,15 @@ contract Database{
           }
       }
      return _company;
+   }
+   function GetEmployeeFromAddress(string memory _employeeAddress)private view returns(Employee memory){
+      Employee memory _employee;
+      for(uint256 i=0; i<employeeCount;i++){
+          if(keccak256(bytes(_employeeAddress)) == keccak256(bytes(employee[i].employeeAddress))){
+              _employee = employee[i];
+          }
+      }
+     return _employee;
    }
    function GetEmployeesFromLocation(string memory _location)public view returns(Employee  [] memory){
        require(bytes(_location).length >1,"Enter the location!");
@@ -229,7 +238,55 @@ contract Database{
         }
         return _employees;
     }
-   
-
-    
+    function GetTheInvitesFromEmployee(string memory _employeeAddress)public view returns(Invite [] memory){
+        require(bytes(_employeeAddress).length >1,"Enter the address of the employee!");
+        require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Employee Address is not valid!");
+        uint _counter=0;
+        Invite [] memory _invites = new Invite[](inviteCount);
+        for(uint256 i=0; i<inviteCount;i++){
+            if(keccak256(bytes(invite[i].employeeAddress)) == keccak256(bytes(_employeeAddress)) && invite[i].rejected == false
+            && invite[i].accepted == false){
+                _invites[_counter] = invite[i];
+                _counter++;
+            }
+        }
+        return _invites;
+    }
+    function GetTimeStampFromEmployee(string memory _employeeAddress)public view returns(uint256){
+        require(bytes(_employeeAddress).length >1,"Enter the address of the employee!");
+        require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Employee Address is not valid!");
+     
+        uint256 _time=0;
+        for(uint i=0; i<employeeCount;i++){
+            if(keccak256(bytes(_employeeAddress)) == keccak256(bytes(employee[i].employeeAddress))){
+                _time = employee[i].timeStamp;
+                break;
+            }
+        }
+        return _time;
+    }
+    function GetIdFromEmployee(string memory _employeeAddress)public view returns(uint256){
+        require(bytes(_employeeAddress).length >1,"Enter the address of the employee!");
+        require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Employee Address is not valid!");
+        uint256 _id=0;
+        for(uint i=0; i<employeeCount;i++){
+            if(keccak256(bytes(_employeeAddress)) == keccak256(bytes(employee[i].employeeAddress))){
+                _id = employee[i].id;
+                break;
+            }
+        }
+        return _id;
+    }
+    function GetCompanyAddressFromEmployee(string memory _employeeAddress)public view returns(string memory){
+        require(bytes(_employeeAddress).length >1,"Enter the address of the employee!");
+        require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Employee Address is not valid!");
+        string memory _address;
+        for(uint i=0; i<employeeCount;i++){
+            if(keccak256(bytes(_employeeAddress)) == keccak256(bytes(employee[i].employeeAddress))){
+                _address = employee[employeeCount].companyAddress;
+                break;
+            }
+        }
+        return _address;
+    }
 }
