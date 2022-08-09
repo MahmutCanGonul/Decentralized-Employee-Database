@@ -106,12 +106,12 @@ contract Database{
                         _name,
                         _employeeAddress,
                         _companyAddress,
-                       _phoneNumber,
-                       _location,
-                       _time,
-                       _job,
-                      _salary,
-                      _national
+                        _phoneNumber,
+                        _location,
+                        _time,
+                        _job,
+                        _salary,
+                        _national
                     );
                     employee[employeeCount] = Employee(employeeCount,_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
                     emit EmployeeCreated(employeeCount,_uid,_name,_employeeAddress,_companyAddress,_phoneNumber,_location,_time,_job,_salary,_national);
@@ -151,7 +151,6 @@ contract Database{
                                 break;
                             }
                         }
- 
        }
        function UpdateInviteDecision(string memory _employeeAddress,uint256 _id,bool _desicion)public{
            require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Employee Address is not valid!");
@@ -159,7 +158,7 @@ contract Database{
            if(keccak256(bytes(invite[_id].employeeAddress)) == keccak256(bytes(_employeeAddress))){
                       if(_desicion){
                           uint daysDiff = (block.timestamp-GetTimeStampFromEmployee(_employeeAddress)) / 60 / 60 / 24; 
-                          if(daysDiff >= 365){
+                          if(daysDiff >= 365 && invite[_id].accepted == false && invite[_id].rejected == false){
                                invite[_id].accepted = true;
                                RemoveEmployee(GetCompanyAddressFromEmployee(_employeeAddress),GetIdFromEmployee(_employeeAddress));
                                Employee memory _employee = GetEmployeeFromAddress(invite[_id].employeeAddress);
@@ -174,7 +173,6 @@ contract Database{
            }
 
        }
-        
        function EmployeesExpensesFromCompany(string memory _companyName)public view returns(uint256){
            require(bytes(_companyName).length >1,"Enter the name of the company!");
            uint256 _expenses=0;
@@ -188,7 +186,7 @@ contract Database{
                     break;
               }
        }
-        return _expenses;
+            return _expenses;
    }
    function GetCompanyFromAddress(string memory _companyAddress)private view returns(Company memory){
       Company memory _company;
@@ -220,17 +218,17 @@ contract Database{
        }
        return _employees;
    } 
-   function GetEmployeesFromCompany(string memory _companyName)public view returns(Employee  [] memory){
-        require(bytes(_companyName).length >1,"Enter the name of the company!");
+   function GetEmployeesFromCompany(string memory _companyAddress)public view returns(Employee  [] memory){
+        require(bytes(_companyAddress).length >1,"Enter the name of the company!");
+        require(ControlCompanyInfoForCreatedCompany(_companyAddress,"") == false,"Company address is already created!");
         uint _counter=0;
         Employee [] memory _employees = new Employee[](employeeCount);
         for(uint i=0; i<companyCount;i++){
-            if(keccak256(bytes(_companyName)) == keccak256(bytes(company[i].companyName))){
+            if(keccak256(bytes(_companyAddress)) == keccak256(bytes(company[i].companyAddress))){
                 for(uint j=0; j<employeeCount;j++){
                     if(keccak256(bytes(employee[j].companyAddress)) == keccak256(bytes(company[i].companyAddress))){
                         _employees[_counter] = employee[j];
                         _counter++;
-        
                     }
                 }
                 break;
@@ -289,4 +287,5 @@ contract Database{
         }
         return _address;
     }
+    
 }
