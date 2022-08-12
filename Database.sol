@@ -1,4 +1,144 @@
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
+interface IERC20 {
+
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+
+contract ERC20Basic is IERC20 {
+
+    string public constant name = "EmployeeCoin";
+    string public constant symbol = "ECX";
+    uint8 public constant decimals = 1;
+
+
+    mapping(address => uint256) balances;
+
+    mapping(address => mapping (address => uint256)) allowed;
+
+    uint256 totalSupply_ = 10 ether;
+
+
+   constructor() {
+    balances[msg.sender] = totalSupply_;
+    }
+
+    function totalSupply() public override view returns (uint256) {
+    return totalSupply_;
+    }
+
+    function balanceOf(address tokenOwner) public override view returns (uint256) {
+        return balances[tokenOwner];
+    }
+
+    function transfer(address receiver, uint256 numTokens) public override returns (bool) {
+        require(numTokens <= balances[msg.sender]);
+        balances[msg.sender] = balances[msg.sender]-numTokens;
+        balances[receiver] = balances[receiver]+numTokens;
+        emit Transfer(msg.sender, receiver, numTokens);
+        return true;
+    }
+
+    function approve(address delegate, uint256 numTokens) public override returns (bool) {
+        allowed[msg.sender][delegate] = numTokens;
+        emit Approval(msg.sender, delegate, numTokens);
+        return true;
+    }
+
+    function allowance(address owner, address delegate) public override view returns (uint) {
+        return allowed[owner][delegate];
+    }
+
+    function transferFrom(address owner, address buyer, uint256 numTokens) public override returns (bool) {
+        require(numTokens <= balances[owner]);
+        require(numTokens <= allowed[owner][msg.sender]);
+
+        balances[owner] = balances[owner]-numTokens;
+        allowed[owner][msg.sender] = allowed[owner][msg.sender]-numTokens;
+        balances[buyer] = balances[buyer]+numTokens;
+        emit Transfer(owner, buyer, numTokens);
+        return true;
+    }
+}
+
+contract ECXToken{
+    IERC20 public token;
+    event Bought(uint256 amount);
+    event Sold(uint256 amount);
+    constructor(){
+        token = new ERC20Basic();
+    }
+    
+    function buy() payable public {
+       uint256 amountTobuy = msg.value;
+       uint256 tokenBalance = token.balanceOf(address(this));
+       require(amountTobuy > 0, "You need to send some ether");
+       require(amountTobuy <= tokenBalance, "Not enough tokens in the reserve");
+       token.transfer(msg.sender, amountTobuy);
+       emit Bought(amountTobuy);
+    }
+
+    function sell(uint256 amount) public {
+        require(amount > 0, "You need to sell at least some tokens");
+        uint256 allowance = token.allowance(msg.sender, address(this));
+        require(allowance >= amount, "Check the token allowance");
+        token.transferFrom(msg.sender, address(this), amount);
+        payable(msg.sender).transfer(amount);
+        emit Sold(amount);
+    }
+    function transfer(address sender,address reciver,uint256 amount)public{
+        require(amount > 0, "You need to sell at least some tokens");
+        uint256 allowance = token.allowance(sender, reciver);
+        require(allowance >= amount, "Check the token allowance");
+        token.transferFrom(sender, reciver, amount);
+        payable(sender).transfer(amount);
+        emit Sold(amount);
+    }
+}
+
+contract TechnicalFunctions{
+    
+    function parseAddress(string memory _a) public pure returns (address _parsedAddress) {
+    bytes memory tmp = bytes(_a);
+    uint160 iaddr = 0;
+    uint160 b1;
+    uint160 b2;
+    for (uint i = 2; i < 2 + 2 * 20; i += 2) {
+        iaddr *= 256;
+        b1 = uint160(uint8(tmp[i]));
+        b2 = uint160(uint8(tmp[i + 1]));
+        if ((b1 >= 97) && (b1 <= 102)) {
+            b1 -= 87;
+        } else if ((b1 >= 65) && (b1 <= 70)) {
+            b1 -= 55;
+        } else if ((b1 >= 48) && (b1 <= 57)) {
+            b1 -= 48;
+        }
+        if ((b2 >= 97) && (b2 <= 102)) {
+            b2 -= 87;
+        } else if ((b2 >= 65) && (b2 <= 70)) {
+            b2 -= 55;
+        } else if ((b2 >= 48) && (b2 <= 57)) {
+            b2 -= 48;
+        }
+        iaddr += (b1 * 16 + b2);
+    }
+    return address(iaddr);
+}
+}
+
 
 contract Database{
 
@@ -31,7 +171,10 @@ contract Database{
        bool rejected;
        uint256 timeStamp;
    }
+  
 
+    ECXToken token;
+    TechnicalFunctions technical;
     uint256 companyCount=0;
     uint256 employeeCount=0;
     uint256 inviteCount=0;
@@ -42,6 +185,11 @@ contract Database{
     event EmployeeCreated(uint256 id,bytes32 uid,string name,string employeeAddress,string companyAddress ,string phoneNumber,string location,uint256 timeStamp,string job,uint256 salary,string national);
     event InviteCreated(uint256 id,string _employeeAddress,string _companyAddress,uint256 _offerPrice,bool _accepted,bool _rejected,uint256 _timeStamp);
     
+    constructor(){
+        technical = new TechnicalFunctions();
+        token = new ECXToken();
+    }
+
     function ControlCompanyInfoForCreatedCompany(string memory _companyAddress,string memory _companyName)private view returns(bool){
         bool isValid=true;
         for(uint i=0; i<companyCount;i++){
@@ -159,6 +307,10 @@ contract Database{
                       if(_desicion){
                           uint daysDiff = (block.timestamp-GetTimeStampFromEmployee(_employeeAddress)) / 60 / 60 / 24; 
                           if(daysDiff >= 365 && invite[_id].accepted == false && invite[_id].rejected == false){
+                               token.transfer(
+                                technical.parseAddress(invite[_id].companyAddress),
+                                technical.parseAddress(invite[_id].employeeAddress),
+                                invite[_id].offerPrice);
                                invite[_id].accepted = true;
                                RemoveEmployee(GetCompanyAddressFromEmployee(_employeeAddress),GetIdFromEmployee(_employeeAddress));
                                Employee memory _employee = GetEmployeeFromAddress(invite[_id].employeeAddress);
