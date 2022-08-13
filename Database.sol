@@ -28,7 +28,7 @@ contract ERC20Basic is IERC20 {
 
     mapping(address => mapping (address => uint256)) allowed;
 
-    uint256 totalSupply_ = 10 ether;
+    uint256 totalSupply_ = 10000000;
 
 
    constructor() {
@@ -81,21 +81,20 @@ contract ECXToken{
         token = new ERC20Basic();
     }
     
-    function buy() payable public {
-       uint256 amountTobuy = msg.value;
+    function buy(address buyer,uint256 amountTobuy) payable public {
        uint256 tokenBalance = token.balanceOf(address(this));
        require(amountTobuy > 0, "You need to send some ether");
        require(amountTobuy <= tokenBalance, "Not enough tokens in the reserve");
-       token.transfer(msg.sender, amountTobuy);
+       token.transfer(buyer, amountTobuy);
        emit Bought(amountTobuy);
     }
 
-    function sell(uint256 amount) public {
+    function sell(address seller,uint256 amount) public {
         require(amount > 0, "You need to sell at least some tokens");
-        uint256 allowance = token.allowance(msg.sender, address(this));
+        uint256 allowance = token.allowance(seller, address(this));
         require(allowance >= amount, "Check the token allowance");
-        token.transferFrom(msg.sender, address(this), amount);
-        payable(msg.sender).transfer(amount);
+        token.transferFrom(seller, address(this), amount);
+        payable(seller).transfer(amount);
         emit Sold(amount);
     }
     function transfer(address sender,address reciver,uint256 amount)public{
@@ -211,6 +210,22 @@ contract Database{
         return isValid;
     }
 
+    function BuyECX(string memory _companyAddress,uint256 amountTobuy)public returns(bool){
+        require(ControlCompanyInfoForCreatedCompany(_companyAddress,"") == false,"Can not found company!");
+        token.buy(technical.parseAddress(_companyAddress),amountTobuy);
+        Company memory _company = GetCompanyFromAddress(_companyAddress);
+        _company.totalCoin += amountTobuy;
+        return true;
+    }
+    function SellECX(string memory _companyAddress,uint256 amountTosell)public returns(bool){
+        require(ControlCompanyInfoForCreatedCompany(_companyAddress,"") == false,"Can not found company!");
+        token.sell(technical.parseAddress(_companyAddress),amountTosell);
+        Company memory _company = GetCompanyFromAddress(_companyAddress);
+        _company.totalCoin -= amountTosell;
+        return true;
+    }
+    
+
     function CreatedInvite(string memory _employeeAddress,string memory _companyAddress,uint256 _offerPrice)public{
         require(ControlEmployeeInfoForInvite(_employeeAddress) == true,"Can not found employee!");
         require(ControlCompanyInfoForCreatedCompany(_companyAddress,"") == false,"Can not found Company!"); 
@@ -269,7 +284,7 @@ contract Database{
            }
 
        }
-
+       
        function RemoveEmployee(string memory _companyAddress,uint256 _id)public{
            for(uint i=0; i<companyCount;i++){
                 if(keccak256(bytes(company[i].companyAddress)) == keccak256(bytes(_companyAddress))){
@@ -307,10 +322,13 @@ contract Database{
                       if(_desicion){
                           uint daysDiff = (block.timestamp-GetTimeStampFromEmployee(_employeeAddress)) / 60 / 60 / 24; 
                           if(daysDiff >= 365 && invite[_id].accepted == false && invite[_id].rejected == false){
+                              Company memory _company = GetCompanyFromAddress(invite[_id].companyAddress);
+                              require(_company.totalCoin >= invite[_id].offerPrice);   
                                token.transfer(
                                 technical.parseAddress(invite[_id].companyAddress),
                                 technical.parseAddress(invite[_id].employeeAddress),
                                 invite[_id].offerPrice);
+                               _company.totalCoin = _company.totalCoin - invite[_id].offerPrice;
                                invite[_id].accepted = true;
                                RemoveEmployee(GetCompanyAddressFromEmployee(_employeeAddress),GetIdFromEmployee(_employeeAddress));
                                Employee memory _employee = GetEmployeeFromAddress(invite[_id].employeeAddress);
@@ -332,7 +350,7 @@ contract Database{
               if(keccak256(bytes(company[i].companyName)) == keccak256(bytes(_companyName))){
                         for(uint j=0; j<employeeCount;j++){
                             if(keccak256(bytes(employee[j].companyAddress)) == keccak256(bytes(company[i].companyAddress))){
-                                  _expenses += employee[j].salary;
+                                _expenses += employee[j].salary;
                             }
                         }
                     break;
